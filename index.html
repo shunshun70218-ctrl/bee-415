@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>秀朗 415 小蜜蜂大進擊！· Galaga v1</title>
+<style>
+  :root {
+    --space-deep: #0b1138;
+    --space-mid:  #1a2266;
+    --space-up:   #2e3aa0;
+    --accent: #ff9c1c;
+    --bee-yellow: #ffd400;
+    --bullet: #fff;
+    --hp: #ff4d6d;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Heiti TC", sans-serif;
+    background: linear-gradient(180deg, #88d8ff 0%, #c7eaff 35%, #b9e08c 60%, #6cae4f 100%);
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 1rem 1rem 2rem;
+    color: #2a2a2a;
+    user-select: none;
+  }
+  h1 {
+    margin: 0.3rem 0 0.1rem;
+    font-size: clamp(1.5rem, 5vw, 2.2rem);
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0 rgba(255,255,255,0.6);
+  }
+  .subtitle { color: #2a4a1a; font-size: 0.85rem; margin-bottom: 0.8rem; opacity: 0.85; text-align:center; }
+
+  .hud {
+    display: flex;
+    gap: 0.7rem;
+    margin-bottom: 0.8rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .hud .chip {
+    background: white;
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    font-weight: 700;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .chip .label { color: #6e7681; font-weight: 600; font-size: 0.8rem; }
+  .chip .val { color: #d04317; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .chip.time .val { color: #2da44e; }
+  .chip.best .val { color: #8957e5; }
+  .chip.hp   .val { color: #cf222e; }
+  .chip.who .val { color: #1f6feb; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 0.3rem; }
+  .chip-photo {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent);
+    vertical-align: middle;
+  }
+  .end-photo {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid var(--accent);
+    margin: 0.3rem auto 0.4rem;
+    display: block;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  }
+  .diff-row-main {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 0 0 0.7rem;
+    align-items: center;
+  }
+  .diff-row-main .diff-row-label {
+    font-size: 0.78rem; color: #2a4a1a; font-weight: 700;
+    background: white; padding: 0.35rem 0.7rem; border-radius: 999px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  }
+
+  /* 遊戲畫布 */
+  .stage {
+    width: min(480px, 94vw);
+    aspect-ratio: 3 / 4;
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    background: radial-gradient(ellipse at 50% 0%, var(--space-up) 0%, var(--space-mid) 45%, var(--space-deep) 100%);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.25), inset 0 0 0 3px #303a8e;
+    touch-action: none;
+  }
+  .stage canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .stage .hint {
+    position: absolute;
+    left: 50%; bottom: 8px;
+    transform: translateX(-50%);
+    color: rgba(255,255,255,0.55);
+    font-size: 0.78rem;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .stage.paused::after {
+    content: '⏸ 按 ▶️ 開始遊戲';
+    position: absolute; inset: 0;
+    color: white; font-weight: 800; font-size: 1.1rem;
+    display:flex; align-items:center; justify-content:center;
+    background: rgba(10,15,40,0.45);
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  .controls {
+    display: flex;
+    gap: 0.7rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.65rem 1.4rem;
+    border-radius: 999px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 700;
+    box-shadow: 0 4px 0 #c47215;
+    transition: transform .1s, box-shadow .1s;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(2px); box-shadow: 0 2px 0 #c47215; }
+  button.secondary {
+    background: white;
+    color: #2a4a1a;
+    box-shadow: 0 4px 0 #b3c5a0;
+  }
+  button.secondary:active { box-shadow: 0 2px 0 #b3c5a0; }
+  .link-btn {
+    background: white;
+    color: #2a4a1a;
+    padding: 0.65rem 1.4rem;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 4px 0 #b3c5a0;
+    transition: transform .1s, box-shadow .1s;
+    display: inline-flex;
+    align-items: center;
+  }
+  .link-btn:hover { transform: translateY(-1px); }
+  .link-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #b3c5a0; }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 30, 40, 0.75);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 1rem;
+  }
+  .overlay.hidden { display: none; }
+  .card {
+    background: white;
+    border-radius: 18px;
+    padding: 1.8rem 2rem;
+    max-width: 90vw;
+    width: 380px;
+    text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4);
+  }
+  .card h2 { margin: 0 0 0.6rem; font-size: 1.6rem; }
+  .card .big {
+    font-size: 3rem;
+    font-weight: 900;
+    color: var(--accent);
+    margin: 0.4rem 0;
+    line-height: 1;
+  }
+  .card .row { color: #57606a; margin: 0.4rem 0; font-size: 0.95rem; }
+  .card button { margin-top: 1rem; }
+  .new-best { color: #d62828; font-weight: 800; }
+
+  .gate-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1.2rem;
+    border: 2px solid #d0d7de;
+    border-radius: 12px;
+    margin: 0.3rem 0;
+    text-align: center;
+    font-family: inherit;
+    background: #fafbfc;
+    transition: border-color .15s, background .15s;
+    font-variant-numeric: tabular-nums;
+  }
+  .gate-input:focus { outline: none; border-color: var(--accent); background: white; }
+  .gate-hint {
+    text-align: left;
+    font-size: 0.8rem;
+    color: #6e7681;
+    margin: 0.5rem 0 0.15rem;
+    font-weight: 600;
+  }
+  .gate-err {
+    color: #cf222e;
+    font-size: 0.85rem;
+    margin: 0.4rem 0 0;
+    min-height: 1.2em;
+  }
+  .gate-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 0.6rem;
+  }
+  .gate-actions button { margin-top: 0; }
+
+  .diff-row {
+    display: flex;
+    gap: 0.4rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 0.2rem 0 0.4rem;
+  }
+  .diff-btn {
+    background: #f0f0f0;
+    color: #57606a;
+    border: 2px solid #d8dde3;
+    border-radius: 999px;
+    padding: 0.4rem 0.95rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: none;
+    margin-top: 0;
+    transition: all .12s;
+  }
+  .diff-btn:hover { transform: none; background: #e8e8e8; }
+  .diff-btn:active { transform: none; box-shadow: none; }
+  .diff-btn.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+    box-shadow: 0 3px 0 #c47215;
+  }
+  .chip.diff .val { color: #0969da; font-size: 0.9rem; }
+
+  .upload-status {
+    font-size: 0.82rem;
+    color: #6e7681;
+    margin: 0.3rem 0;
+    min-height: 1.2em;
+  }
+  .upload-status.ok { color: #2da44e; }
+  .upload-status.err { color: #cf222e; }
+  .end-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+  }
+  .end-actions button, .end-actions .link-btn { margin-top: 0; }
+
+  footer { margin-top: 1rem; color: #2a4a1a; font-size: 0.8rem; text-align: center; opacity: 0.8; }
+
+  .decor {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .decor svg { position: absolute; }
+  body > h1, body > .subtitle, body > .hud, body > .stage, body > .diff-row-main, body > .controls, body > footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  .sun {
+    top: 14px;
+    right: 18px;
+    width: clamp(60px, 9vw, 84px);
+    height: clamp(60px, 9vw, 84px);
+    animation: sun-spin 24s linear infinite;
+    filter: drop-shadow(0 4px 10px rgba(255,180,30,0.45));
+  }
+  @keyframes sun-spin { to { transform: rotate(360deg); } }
+
+  .cloud { opacity: 0.95; filter: drop-shadow(0 6px 8px rgba(0,0,0,0.08)); }
+  .cloud-1 {
+    top: 80px; left: 4%;
+    width: clamp(90px, 14vw, 140px);
+    animation: cloud-drift-1 24s ease-in-out infinite;
+  }
+  .cloud-2 {
+    top: 170px; right: 6%;
+    width: clamp(70px, 11vw, 110px);
+    animation: cloud-drift-2 30s ease-in-out infinite;
+  }
+  @keyframes cloud-drift-1 {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(30px); }
+  }
+  @keyframes cloud-drift-2 {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(-26px); }
+  }
+
+  .butterfly {
+    width: 46px; height: 46px;
+    top: 50%; left: 8%;
+    animation: butterfly-fly 16s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+  .butterfly .wing {
+    transform-origin: 23px 23px;
+    animation: butterfly-flap 0.32s ease-in-out infinite alternate;
+  }
+  .butterfly .wing.right { animation-delay: 0s; }
+  .butterfly .wing.left  { transform: scaleX(-1); transform-origin: 23px 23px; }
+  @keyframes butterfly-flap {
+    from { transform: scaleX(1) rotateY(0deg); }
+    to   { transform: scaleX(1) rotateY(60deg); }
+  }
+  @keyframes butterfly-fly {
+    0%   { transform: translate(0, 0) rotate(-8deg); }
+    25%  { transform: translate(40px, -30px) rotate(6deg); }
+    50%  { transform: translate(120px, 10px) rotate(-4deg); }
+    75%  { transform: translate(50px, 50px) rotate(8deg); }
+    100% { transform: translate(0, 0) rotate(-8deg); }
+  }
+
+  @media (max-width: 480px) {
+    .sun { width: 56px; height: 56px; top: 8px; right: 8px; }
+    .cloud-1 { top: 60px; width: 80px; }
+    .cloud-2 { top: 130px; width: 64px; }
+    .butterfly { width: 36px; height: 36px; }
+    h1 { font-size: 1.3rem; }
+    .controls button, .controls .link-btn { padding: 0.55rem 1rem; font-size: 0.9rem; }
+    .card { padding: 1.4rem 1.4rem; }
+    .card .big { font-size: 2.4rem; }
+  }
+</style>
+</head>
+<body>
+  <div class="decor" aria-hidden="true">
+    <svg class="sun" viewBox="0 0 80 80">
+      <g stroke="#ffb71c" stroke-width="4" stroke-linecap="round">
+        <line x1="40" y1="4"  x2="40" y2="14"/>
+        <line x1="40" y1="66" x2="40" y2="76"/>
+        <line x1="4"  y1="40" x2="14" y2="40"/>
+        <line x1="66" y1="40" x2="76" y2="40"/>
+        <line x1="14" y1="14" x2="21" y2="21"/>
+        <line x1="59" y1="59" x2="66" y2="66"/>
+        <line x1="14" y1="66" x2="21" y2="59"/>
+        <line x1="59" y1="21" x2="66" y2="14"/>
+      </g>
+      <circle cx="40" cy="40" r="20" fill="#ffd24a" stroke="#ffb71c" stroke-width="2"/>
+      <circle cx="33" cy="38" r="2.2" fill="#7a4a00"/>
+      <circle cx="47" cy="38" r="2.2" fill="#7a4a00"/>
+      <path d="M 32 44 Q 40 50 48 44" stroke="#7a4a00" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="30" cy="46" r="2" fill="#ff8da1" opacity="0.6"/>
+      <circle cx="50" cy="46" r="2" fill="#ff8da1" opacity="0.6"/>
+    </svg>
+    <svg class="cloud cloud-1" viewBox="0 0 110 60">
+      <ellipse cx="28" cy="36" rx="20" ry="14" fill="white"/>
+      <ellipse cx="55" cy="26" rx="22" ry="16" fill="white"/>
+      <ellipse cx="82" cy="34" rx="18" ry="13" fill="white"/>
+      <ellipse cx="55" cy="42" rx="38" ry="11" fill="white"/>
+    </svg>
+    <svg class="cloud cloud-2" viewBox="0 0 100 50">
+      <ellipse cx="25" cy="28" rx="18" ry="12" fill="white"/>
+      <ellipse cx="52" cy="22" rx="20" ry="14" fill="white"/>
+      <ellipse cx="76" cy="30" rx="16" ry="11" fill="white"/>
+      <ellipse cx="50" cy="36" rx="32" ry="9" fill="white"/>
+    </svg>
+    <svg class="butterfly" viewBox="0 0 46 46">
+      <ellipse cx="23" cy="23" rx="1.6" ry="9" fill="#3a2a1a"/>
+      <circle cx="23" cy="14" r="2.2" fill="#3a2a1a"/>
+      <path d="M 22 13 Q 19 8 16 7" stroke="#3a2a1a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <path d="M 24 13 Q 27 8 30 7" stroke="#3a2a1a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <circle cx="16" cy="7" r="1" fill="#3a2a1a"/>
+      <circle cx="30" cy="7" r="1" fill="#3a2a1a"/>
+      <g class="wing right">
+        <path d="M 23 18 Q 38 8 42 18 Q 42 24 32 24 Q 27 24 23 22 Z"
+              fill="#ff9ec7" stroke="#c54a8a" stroke-width="1.2"/>
+        <path d="M 23 24 Q 36 26 40 34 Q 38 40 30 38 Q 25 36 23 30 Z"
+              fill="#ffc7dc" stroke="#c54a8a" stroke-width="1.2"/>
+        <circle cx="35" cy="16" r="1.6" fill="#fff"/>
+        <circle cx="33" cy="32" r="1.4" fill="#fff"/>
+      </g>
+      <g class="wing left">
+        <path d="M 23 18 Q 38 8 42 18 Q 42 24 32 24 Q 27 24 23 22 Z"
+              fill="#ff9ec7" stroke="#c54a8a" stroke-width="1.2"/>
+        <path d="M 23 24 Q 36 26 40 34 Q 38 40 30 38 Q 25 36 23 30 Z"
+              fill="#ffc7dc" stroke="#c54a8a" stroke-width="1.2"/>
+        <circle cx="35" cy="16" r="1.6" fill="#fff"/>
+        <circle cx="33" cy="32" r="1.4" fill="#fff"/>
+      </g>
+    </svg>
+  </div>
+
+  <h1>🐝 秀朗 415 小蜜蜂大進擊！🚀</h1>
+  <div class="subtitle">90 秒挑戰！射爆所有蜜蜂，小美女蜂 = 雙倍分數！</div>
+
+  <div class="hud">
+    <div class="chip who"><span class="label">學號</span><span class="val" id="who-chip">—</span></div>
+    <div class="chip"><span class="label">分數</span><span class="val" id="score">0</span></div>
+    <div class="chip time"><span class="label">剩餘</span><span class="val" id="time">90</span><span style="font-size:0.8rem;color:#57606a;">秒</span></div>
+    <div class="chip best"><span class="label">最高</span><span class="val" id="best">0</span></div>
+    <div class="chip hp"><span class="label">生命</span><span class="val" id="hp">❤❤❤</span></div>
+    <div class="chip"><span class="label">連擊</span><span class="val" id="combo" style="color:#0969da;">0</span></div>
+    <div class="chip diff"><span class="label">難度</span><span class="val" id="diff-chip">普通</span></div>
+  </div>
+
+  <div class="diff-row-main">
+    <span class="diff-row-label">難度：</span>
+    <button class="diff-btn" data-diff="easy" type="button">😌 簡單</button>
+    <button class="diff-btn active" data-diff="normal" type="button">🙂 普通</button>
+    <button class="diff-btn" data-diff="hard" type="button">😈 困難</button>
+  </div>
+
+  <div class="stage paused" id="stage">
+    <canvas id="cv" width="480" height="640"></canvas>
+    <div class="hint">⬅️ ➡️ 移動 ・ 空白鍵 / 點擊 射擊 ・ 手機可拖曳</div>
+  </div>
+
+  <div class="controls">
+    <button id="start">▶️ 開始遊戲</button>
+    <button id="sound" class="secondary">🔊 音效：開</button>
+    <button id="music" class="secondary">🎵 音樂：開</button>
+    <a href="all.html" class="link-btn">💖 看小美女</a>
+    <a href="leaderboard.html" class="link-btn">🏆 排行版</a>
+  </div>
+
+  <!-- Gate：開始遊戲時跳出，要求輸入學號 + 選難度 -->
+  <div class="overlay hidden" id="gate-screen">
+    <div class="card">
+      <h2>請輸入學號</h2>
+      <div class="row">輸入後就開始 90 秒挑戰</div>
+      <div class="gate-hint">學號（同學請輸入自己的學號）</div>
+      <input class="gate-input" id="in-student" type="text" inputmode="numeric"
+             placeholder="同學：15　/　老師：0" maxlength="20" autocomplete="off">
+      <div style="font-size:0.85rem;color:#cf222e;font-weight:700;margin:0.3rem 0 0.2rem;">
+        👩‍🏫 老師請輸入 <span style="background:#fff8d8;padding:0.1rem 0.4rem;border-radius:6px;border:1px dashed #b8860b;">0</span>
+      </div>
+      <div class="gate-hint">選擇難度</div>
+      <div class="diff-row" id="diff-row-gate">
+        <button class="diff-btn" data-diff="easy" type="button">😌 簡單</button>
+        <button class="diff-btn active" data-diff="normal" type="button">🙂 普通</button>
+        <button class="diff-btn" data-diff="hard" type="button">😈 困難</button>
+      </div>
+      <div class="gate-err" id="gate-err"></div>
+      <div class="gate-actions">
+        <button id="gate-cancel" class="secondary">取消</button>
+        <button id="gate-confirm">▶️ 開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結束畫面 -->
+  <div class="overlay hidden" id="end-screen">
+    <div class="card">
+      <h2 id="end-title">時間到！</h2>
+      <div class="row" id="end-who">—</div>
+      <div class="row">你的分數</div>
+      <div class="big" id="final-score">0</div>
+      <div class="row">最高分：<span id="end-best">0</span> <span id="new-best" class="new-best" style="display:none;">🎉 新紀錄！</span></div>
+      <div class="upload-status" id="upload-status">⏳ 上傳分數中…</div>
+      <div class="end-actions">
+        <button id="restart">🔄 再玩一次</button>
+        <a href="leaderboard.html" class="link-btn">🏆 排行版</a>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    秀朗 415 班專屬版 v1 · 學號挑戰 + 班級排行榜 · Made with Claude Code × GitHub Pages
+  </footer>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, collection, addDoc, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { firebaseConfig, SCORES_COLLECTION } from "./firebase-config.js";
+import { photoForStudent } from "./students.js";
+
+// === Firebase init ===
+let db = null;
+let firebaseReady = false;
+try {
+  if (firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("PASTE_")) {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    firebaseReady = true;
+  }
+} catch (e) {
+  console.warn("Firebase init failed:", e);
+}
+
+// === Emoji 頭像（依學號 hash 決定，用於排行榜識別）===
+const EMOJI_POOL = ['🐹','🐰','🐻','🐼','🐨','🐯','🦁','🐸','🐵','🦊','🐺','🐮','🐷','🐶','🐱','🦝','🐭','🦥','🦦','🐢','🦔','🐧','🦄','🦓','🦒','🐔','🐤','🦉','🐙','🦋','🐝','🐳'];
+function hashStr(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+function pickEmoji(studentId) {
+  if (!studentId) return '🎯';
+  return EMOJI_POOL[hashStr(studentId) % EMOJI_POOL.length];
+}
+
+const $ = id => document.getElementById(id);
+
+// === 三段難度設定 ===
+const DIFFICULTIES = {
+  easy:   { label: '😌 簡單', beeSpeed: 0.35, diveChance: 0.0018, beeBulletSpeed: 2.0, playerCool: 240, rows: 3 },
+  normal: { label: '🙂 普通', beeSpeed: 0.55, diveChance: 0.0035, beeBulletSpeed: 2.8, playerCool: 200, rows: 4 },
+  hard:   { label: '😈 困難', beeSpeed: 0.85, diveChance: 0.006,  beeBulletSpeed: 3.6, playerCool: 170, rows: 5 },
+};
+let difficulty = localStorage.getItem('bee_diff') || 'normal';
+if (!DIFFICULTIES[difficulty]) difficulty = 'normal';
+let D = DIFFICULTIES[difficulty];
+
+// === Player state（學號）===
+let player = JSON.parse(localStorage.getItem('bee_player') || localStorage.getItem('whack_v2_player') || 'null');
+
+function applyPlayerUI() {
+  const chip = $('who-chip');
+  if (!player) { chip.textContent = '—'; return; }
+  const photo = photoForStudent(player.studentId) || 'face-default.svg';
+  chip.innerHTML = `<img class="chip-photo" src="${photo}" alt="${player.studentId}"> ${player.studentId}`;
+}
+applyPlayerUI();
+
+function applyDiffUI() {
+  $('diff-chip').textContent = D.label;
+  document.querySelectorAll('.diff-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.diff === difficulty);
+  });
+}
+function setDifficulty(d) {
+  if (!DIFFICULTIES[d]) return;
+  difficulty = d;
+  D = DIFFICULTIES[d];
+  localStorage.setItem('bee_diff', d);
+  applyDiffUI();
+}
+document.querySelectorAll('.diff-btn').forEach(b => {
+  b.addEventListener('click', () => setDifficulty(b.dataset.diff));
+});
+applyDiffUI();
+
+// === Gate ===
+function openGate() {
+  $('gate-err').textContent = '';
+  $('in-student').value = player ? player.studentId : '';
+  $('gate-screen').classList.remove('hidden');
+  applyDiffUI();
+  setTimeout(() => { $('in-student').focus(); $('in-student').select(); }, 50);
+}
+function closeGate() { $('gate-screen').classList.add('hidden'); }
+
+$('gate-cancel').addEventListener('click', closeGate);
+$('gate-confirm').addEventListener('click', () => {
+  const studentId = $('in-student').value.trim();
+  if (!studentId) { $('gate-err').textContent = '請輸入學號'; return; }
+  if (studentId.length > 20) { $('gate-err').textContent = '學號過長（≤20 字）'; return; }
+  player = { studentId };
+  localStorage.setItem('bee_player', JSON.stringify(player));
+  applyPlayerUI();
+  closeGate();
+  startGame();
+});
+$('in-student').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('gate-confirm').click();
+  if (e.key === 'Escape') closeGate();
+});
+
+// ====================== 遊戲核心 ======================
+const ROUND_MS = 90000;
+const CV = $('cv');
+const ctx = CV.getContext('2d');
+const W = CV.width, H = CV.height;
+
+// 玩家頭像（顯示在飛機駕駛艙）
+const playerFaceImg = new Image();
+let playerFaceLoaded = false;
+function setPlayerFaceSrc() {
+  if (!player) { playerFaceLoaded = false; return; }
+  const src = photoForStudent(player.studentId) || 'face-default.svg';
+  playerFaceLoaded = false;
+  playerFaceImg.onload = () => { playerFaceLoaded = true; };
+  playerFaceImg.onerror = () => { playerFaceLoaded = false; };
+  playerFaceImg.src = src;
+}
+
+// 小美女蜂（特殊敵人）使用 14 張學號照片
+const FACES = [
+  'face-01.jpg','face-02.jpg','face-03.jpg','face-04.jpg','face-05.jpg','face-06.jpg','face-07.jpg',
+  'face-08.jpg','face-09.jpg','face-10.jpg','face-11.jpg','face-12.jpg','face-13.jpg','face-14.jpg',
+];
+const faceImgs = {};
+let faceBag = [];
+function preloadFaces() {
+  FACES.forEach(f => {
+    if (faceImgs[f]) return;
+    const img = new Image();
+    img.src = f;
+    faceImgs[f] = img;
+  });
+}
+function nextFace() {
+  if (faceBag.length === 0) {
+    faceBag = FACES.slice();
+    for (let i = faceBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [faceBag[i], faceBag[j]] = [faceBag[j], faceBag[i]];
+    }
+  }
+  return faceBag.shift();
+}
+
+// 狀態
+let score = 0, combo = 0, hp = 3;
+let best = +(localStorage.getItem('bee_best') || 0);
+let timeLeft = ROUND_MS / 1000;
+let running = false;
+let endAt = 0;
+let lastT = 0;
+let countdownTimer = null;
+let soundOn = true, musicOn = true;
+let bgmTimer = null, bgmIndex = 0;
+$('best').textContent = best;
+$('hp').textContent = '❤❤❤';
+
+// 物件
+let bees = [];        // {x,y,col,row,baseX,baseY, state:'formation'|'diving', vx,vy, face?, alive}
+let bullets = [];     // {x,y,vy} from player
+let enemyBullets = [];// {x,y,vy}
+let particles = [];   // explosion bits
+let playerObj = { x: W/2, y: H - 64, w: 44, h: 44, cool: 0 };
+let formation = { dir: 1, speed: 0, descend: 0 };
+let wave = 0;
+
+// 輸入
+const keys = { left: false, right: false, fire: false };
+let touchPointerX = null;
+
+addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+  if (e.key === 'ArrowRight'|| e.key === 'd' || e.key === 'D') keys.right = true;
+  if (e.key === ' ' || e.key === 'Spacebar') { keys.fire = true; e.preventDefault(); }
+});
+addEventListener('keyup', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+  if (e.key === 'ArrowRight'|| e.key === 'd' || e.key === 'D') keys.right = false;
+  if (e.key === ' ' || e.key === 'Spacebar') keys.fire = false;
+});
+
+const stage = $('stage');
+function stageCoordsFromEvent(e) {
+  const rect = CV.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / rect.width) * W;
+  return x;
+}
+stage.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  touchPointerX = stageCoordsFromEvent(e);
+  keys.fire = true;
+  stage.setPointerCapture?.(e.pointerId);
+});
+stage.addEventListener('pointermove', (e) => {
+  if (touchPointerX != null) touchPointerX = stageCoordsFromEvent(e);
+});
+stage.addEventListener('pointerup', (e) => {
+  touchPointerX = null;
+  keys.fire = false;
+});
+stage.addEventListener('pointercancel', () => {
+  touchPointerX = null;
+  keys.fire = false;
+});
+
+// 音效
+let audioCtx = null;
+function beep(freq, duration = 0.06, type = 'square', vol = 0.18) {
+  if (!soundOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    o.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+
+// 8-bit BGM (改太空感的小調)
+const BGM_MELODY = [
+  392.00, 523.25, 659.25, 783.99, 659.25, 523.25, 392.00, 523.25,
+  349.23, 466.16, 587.33, 698.46, 587.33, 466.16, 349.23, 466.16,
+  329.63, 415.30, 523.25, 659.25, 523.25, 415.30, 329.63, 415.30,
+  392.00, 523.25, 659.25, 783.99, 659.25, 523.25, 392.00, 523.25,
+];
+const BGM_BASS = [98.00, 130.81, 87.31, 110.00];
+function bgmTone(freq, duration, type, vol) {
+  if (!musicOn) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    o.stop(audioCtx.currentTime + duration);
+  } catch (e) {}
+}
+function bgmStep() {
+  if (!musicOn || !running) { bgmTimer = null; return; }
+  bgmTone(BGM_MELODY[bgmIndex], 0.18, 'triangle', 0.05);
+  if (bgmIndex % 8 === 0) bgmTone(BGM_BASS[(bgmIndex / 8) | 0], 0.55, 'sawtooth', 0.04);
+  bgmIndex = (bgmIndex + 1) % BGM_MELODY.length;
+  const tempo = timeLeft <= 10 ? 140 : 220;
+  bgmTimer = setTimeout(bgmStep, tempo);
+}
+function startBgm() { stopBgm(); bgmIndex = 0; bgmStep(); }
+function stopBgm() { if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; } }
+
+// ===== 編隊產生 =====
+function spawnWave() {
+  wave++;
+  bees = [];
+  const cols = 8;
+  const rows = D.rows;
+  const spacingX = 46;
+  const spacingY = 40;
+  const startX = (W - (cols - 1) * spacingX) / 2;
+  const startY = 60;
+  const specialCount = Math.min(3 + wave, 6); // 每波 3~6 隻小美女蜂
+  const specialIdxSet = new Set();
+  while (specialIdxSet.size < specialCount) {
+    specialIdxSet.add(Math.floor(Math.random() * cols * rows));
+  }
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c;
+      const isSpecial = specialIdxSet.has(idx);
+      bees.push({
+        col: c, row: r,
+        baseX: startX + c * spacingX,
+        baseY: startY + r * spacingY,
+        x: startX + c * spacingX,
+        y: startY + r * spacingY,
+        w: 30, h: 28,
+        state: 'formation',
+        vx: 0, vy: 0,
+        diveT: 0,
+        face: isSpecial ? nextFace() : null,
+        alive: true,
+        hueShift: r * 30,
+      });
+    }
+  }
+  formation.dir = 1;
+  formation.descend = 0;
+  formation.speed = 0.5 + wave * 0.08;
+}
+
+// ===== 主迴圈 =====
+function tick(t) {
+  if (!running) return;
+  const dt = Math.min(48, t - (lastT || t));
+  lastT = t;
+  update(dt);
+  render();
+  requestAnimationFrame(tick);
+}
+
+function update(dt) {
+  // 玩家移動
+  const moveSpd = 0.45;
+  if (touchPointerX != null) {
+    const tx = Math.max(playerObj.w/2, Math.min(W - playerObj.w/2, touchPointerX));
+    const diff = tx - playerObj.x;
+    playerObj.x += Math.sign(diff) * Math.min(Math.abs(diff), moveSpd * dt);
+  } else {
+    if (keys.left)  playerObj.x -= moveSpd * dt;
+    if (keys.right) playerObj.x += moveSpd * dt;
+  }
+  playerObj.x = Math.max(playerObj.w/2, Math.min(W - playerObj.w/2, playerObj.x));
+
+  // 射擊
+  playerObj.cool -= dt;
+  if (keys.fire && playerObj.cool <= 0) {
+    bullets.push({ x: playerObj.x - 2, y: playerObj.y - 18, w: 4, h: 12, vy: -0.9 });
+    bullets.push({ x: playerObj.x + 2 - 4, y: playerObj.y - 18, w: 4, h: 12, vy: -0.9 });
+    // 雙連發
+    beep(1100, 0.04, 'square', 0.12);
+    playerObj.cool = D.playerCool;
+  }
+
+  // 玩家子彈
+  for (const b of bullets) b.y += b.vy * dt;
+  bullets = bullets.filter(b => b.y > -20);
+
+  // 蜜蜂編隊水平移動
+  let needDescend = false;
+  for (const bee of bees) {
+    if (!bee.alive) continue;
+    if (bee.state === 'formation') {
+      bee.baseX += formation.dir * formation.speed * (dt/16);
+      bee.x = bee.baseX;
+      bee.y = bee.baseY + formation.descend;
+      if (bee.x < 20 || bee.x > W - 20) needDescend = true;
+      // 隨機俯衝
+      if (Math.random() < D.diveChance * (dt/16)) {
+        bee.state = 'diving';
+        bee.vx = (playerObj.x - bee.x) / 240;
+        bee.vy = 0.18 + Math.random() * 0.15;
+        bee.diveT = 0;
+      }
+    } else if (bee.state === 'diving') {
+      bee.diveT += dt;
+      bee.x += bee.vx * dt;
+      bee.y += bee.vy * dt;
+      bee.vy += 0.0008 * dt; // 慢慢加速
+      // 偶爾發射敵彈
+      if (Math.random() < 0.0025 * (dt/16) && bee.y < H - 100) {
+        enemyBullets.push({ x: bee.x, y: bee.y + 16, w: 4, h: 10, vy: D.beeBulletSpeed * 0.5 });
+      }
+      // 飛出畫面，回編隊
+      if (bee.y > H + 30) {
+        bee.state = 'formation';
+        bee.y = -20;
+        bee.x = bee.baseX;
+      }
+    }
+  }
+  if (needDescend) {
+    formation.dir *= -1;
+    formation.descend += 8;
+  }
+
+  // 敵彈
+  for (const b of enemyBullets) b.y += b.vy * dt * 0.06 + b.vy * (dt/16);
+  enemyBullets = enemyBullets.filter(b => b.y < H + 20);
+
+  // 玩家子彈 vs 蜜蜂
+  for (const bul of bullets) {
+    for (const bee of bees) {
+      if (!bee.alive) continue;
+      if (Math.abs(bul.x - bee.x) < bee.w/2 && Math.abs(bul.y - bee.y) < bee.h/2) {
+        bee.alive = false;
+        bul.y = -100; // 移除
+        const gain = bee.face ? 5 : 1;
+        combo++;
+        let bonus = combo >= 5 ? 2 : 1;
+        const total = gain * bonus;
+        score += total;
+        $('score').textContent = score;
+        $('combo').textContent = combo;
+        spawnParticles(bee.x, bee.y, bee.face ? '#ff9ec7' : '#ffd400', 14);
+        beep(bee.face ? 880 : 660, 0.07, 'square', 0.18);
+        if (bonus > 1) setTimeout(() => beep(1320, 0.04, 'triangle', 0.16), 50);
+        break;
+      }
+    }
+  }
+  bees = bees.filter(b => b.alive);
+  if (bees.length === 0) {
+    spawnWave();
+  }
+
+  // 敵彈 vs 玩家
+  for (const b of enemyBullets) {
+    if (Math.abs(b.x - playerObj.x) < playerObj.w/2 - 4 &&
+        Math.abs(b.y - playerObj.y) < playerObj.h/2 - 4) {
+      b.y = H + 100;
+      hitPlayer();
+    }
+  }
+  // 蜜蜂俯衝撞玩家
+  for (const bee of bees) {
+    if (bee.state !== 'diving') continue;
+    if (Math.abs(bee.x - playerObj.x) < playerObj.w/2 &&
+        Math.abs(bee.y - playerObj.y) < playerObj.h/2) {
+      bee.alive = false;
+      spawnParticles(bee.x, bee.y, '#ff4d6d', 18);
+      hitPlayer();
+    }
+  }
+
+  // 粒子
+  for (const p of particles) {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 0.0006 * dt;
+    p.life -= dt;
+  }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function hitPlayer() {
+  combo = 0; $('combo').textContent = 0;
+  hp--;
+  $('hp').textContent = '❤'.repeat(Math.max(0, hp)) || '💀';
+  spawnParticles(playerObj.x, playerObj.y, '#ff4d6d', 24);
+  beep(180, 0.18, 'sawtooth', 0.2);
+  if (hp <= 0) end(true);
+}
+
+function spawnParticles(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 0.1 + Math.random() * 0.4;
+    particles.push({
+      x, y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 0.15,
+      life: 400 + Math.random()*300, max: 600,
+      color, size: 2 + Math.random()*3
+    });
+  }
+}
+
+// ===== 繪圖 =====
+function drawStarfield(t) {
+  // 簡單卷動星空
+  if (!drawStarfield.stars) {
+    drawStarfield.stars = [];
+    for (let i = 0; i < 60; i++) {
+      drawStarfield.stars.push({ x: Math.random()*W, y: Math.random()*H, s: Math.random()*1.4 + 0.4, v: 0.02 + Math.random()*0.06 });
+    }
+  }
+  for (const st of drawStarfield.stars) {
+    st.y += st.v * 16;
+    if (st.y > H) { st.y = 0; st.x = Math.random()*W; }
+    ctx.fillStyle = 'rgba(255,255,255,' + (0.4 + st.s*0.3).toFixed(2) + ')';
+    ctx.fillRect(st.x, st.y, st.s, st.s);
+  }
+}
+
+function drawBee(b) {
+  const x = b.x, y = b.y;
+  if (b.face && faceImgs[b.face] && faceImgs[b.face].complete && faceImgs[b.face].naturalWidth > 0) {
+    // 小美女蜂：頭像 + 翅膀光環
+    ctx.save();
+    // 光圈
+    ctx.beginPath();
+    ctx.arc(x, y, 18, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,158,199,0.35)';
+    ctx.fill();
+    // 翅膀
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath(); ctx.ellipse(x-14, y-3, 8, 5, -0.4, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x+14, y-3, 8, 5,  0.4, 0, Math.PI*2); ctx.fill();
+    // 頭像圓形
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(faceImgs[b.face], x-14, y-14, 28, 28);
+    ctx.restore();
+    // 邊框
+    ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI*2);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ff5da6';
+    ctx.stroke();
+    // 小皇冠
+    ctx.fillStyle = '#ffd400';
+    ctx.beginPath();
+    ctx.moveTo(x-8, y-14);
+    ctx.lineTo(x-5, y-20);
+    ctx.lineTo(x-2, y-14);
+    ctx.lineTo(x,   y-19);
+    ctx.lineTo(x+2, y-14);
+    ctx.lineTo(x+5, y-20);
+    ctx.lineTo(x+8, y-14);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#a8731a'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  // 普通蜜蜂
+  ctx.save();
+  // 翅膀（半透明）
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.beginPath(); ctx.ellipse(x-10, y-3, 7, 5, -0.5, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(x+10, y-3, 7, 5,  0.5, 0, Math.PI*2); ctx.fill();
+  // 身體
+  ctx.fillStyle = '#ffd400';
+  ctx.strokeStyle = '#3a2a08';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.ellipse(x, y, 11, 9, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  // 條紋
+  ctx.fillStyle = '#3a2a08';
+  ctx.fillRect(x-7, y-2, 14, 2);
+  ctx.fillRect(x-5, y+2, 10, 2);
+  // 眼睛
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(x-5, y-5, 3, 3);
+  ctx.fillRect(x+2, y-5, 3, 3);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(x-4, y-4, 1.5, 1.5);
+  ctx.fillRect(x+3, y-4, 1.5, 1.5);
+  // 觸鬚
+  ctx.strokeStyle = '#3a2a08';
+  ctx.beginPath();
+  ctx.moveTo(x-3, y-8); ctx.lineTo(x-6, y-12);
+  ctx.moveTo(x+3, y-8); ctx.lineTo(x+6, y-12);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPlayer() {
+  const x = playerObj.x, y = playerObj.y;
+  ctx.save();
+  // 火焰
+  ctx.fillStyle = '#ff7a1c';
+  ctx.beginPath();
+  ctx.moveTo(x-6, y+18);
+  ctx.lineTo(x,   y+26 + Math.sin(performance.now()/40)*2);
+  ctx.lineTo(x+6, y+18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#ffd400';
+  ctx.beginPath();
+  ctx.moveTo(x-3, y+18);
+  ctx.lineTo(x,   y+22 + Math.sin(performance.now()/40)*1.5);
+  ctx.lineTo(x+3, y+18);
+  ctx.closePath();
+  ctx.fill();
+  // 機身
+  ctx.fillStyle = '#e8eef5';
+  ctx.strokeStyle = '#2a3550';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y-22);          // 機鼻
+  ctx.lineTo(x+18, y+8);        // 右翼
+  ctx.lineTo(x+10, y+16);
+  ctx.lineTo(x-10, y+16);
+  ctx.lineTo(x-18, y+8);        // 左翼
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // 駕駛艙圓窗 + 學號頭像
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y-2, 9, 0, Math.PI*2);
+  ctx.closePath();
+  ctx.clip();
+  if (playerFaceLoaded) {
+    ctx.drawImage(playerFaceImg, x-9, y-11, 18, 18);
+  } else {
+    ctx.fillStyle = '#9ec5ff';
+    ctx.fillRect(x-9, y-11, 18, 18);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(x, y-2, 9, 0, Math.PI*2);
+  ctx.lineWidth = 2; ctx.strokeStyle = '#ff9c1c';
+  ctx.stroke();
+  // 機翼末端紅點
+  ctx.fillStyle = '#ff4d6d';
+  ctx.fillRect(x-19, y+6, 4, 4);
+  ctx.fillRect(x+15, y+6, 4, 4);
+  ctx.restore();
+}
+
+function render() {
+  ctx.clearRect(0,0,W,H);
+  drawStarfield();
+  // 蜜蜂
+  for (const b of bees) if (b.alive) drawBee(b);
+  // 玩家子彈
+  ctx.fillStyle = '#fff';
+  for (const b of bullets) {
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+  }
+  // 敵彈
+  ctx.fillStyle = '#ff5e5e';
+  for (const b of enemyBullets) {
+    ctx.fillRect(b.x-2, b.y, 4, 10);
+  }
+  drawPlayer();
+  // 粒子
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.max);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function startGame() {
+  setPlayerFaceSrc();
+  preloadFaces();
+  score = 0; combo = 0; hp = 3;
+  $('score').textContent = 0;
+  $('combo').textContent = 0;
+  $('hp').textContent = '❤❤❤';
+  timeLeft = ROUND_MS / 1000;
+  $('time').textContent = timeLeft;
+  bullets = []; enemyBullets = []; particles = [];
+  playerObj.x = W/2;
+  wave = 0;
+  spawnWave();
+  $('end-screen').classList.add('hidden');
+  stage.classList.remove('paused');
+  running = true;
+  endAt = performance.now() + ROUND_MS;
+  lastT = 0;
+  if (!audioCtx) try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+  if (musicOn) startBgm();
+  requestAnimationFrame(tick);
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    const left = Math.max(0, Math.ceil((endAt - performance.now()) / 1000));
+    timeLeft = left;
+    $('time').textContent = left;
+    if (left <= 0) end(false);
+    else if (left <= 5) beep(660, 0.04, 'sine', 0.12);
+  }, 250);
+}
+
+async function uploadScore() {
+  const statusEl = $('upload-status');
+  if (!firebaseReady) {
+    statusEl.textContent = '⚠️ Firebase 未設定，分數沒上傳';
+    statusEl.className = 'upload-status err';
+    return;
+  }
+  if (!player) {
+    statusEl.textContent = '（沒有學號，不上傳）';
+    statusEl.className = 'upload-status';
+    return;
+  }
+  if (score <= 0) {
+    statusEl.textContent = '（0 分不上傳）';
+    statusEl.className = 'upload-status';
+    return;
+  }
+  statusEl.textContent = '⏳ 上傳分數中…';
+  statusEl.className = 'upload-status';
+  try {
+    await addDoc(collection(db, SCORES_COLLECTION), {
+      studentId: player.studentId,
+      emoji: pickEmoji(player.studentId),
+      score,
+      difficulty,
+      game: 'bee',
+      createdAt: serverTimestamp(),
+    });
+    statusEl.textContent = '✅ 分數已上傳到排行榜';
+    statusEl.className = 'upload-status ok';
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = '❌ 上傳失敗：' + (e.message || e.code || '未知錯誤');
+    statusEl.className = 'upload-status err';
+  }
+}
+
+function end(byHp) {
+  running = false;
+  stopBgm();
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  stage.classList.add('paused');
+  beep(523, 0.12, 'sine', 0.18);
+  setTimeout(() => beep(392, 0.18, 'sine', 0.16), 130);
+  const newBest = score > best;
+  if (newBest) {
+    best = score;
+    localStorage.setItem('bee_best', best);
+  }
+  $('best').textContent = best;
+  $('end-best').textContent = best;
+  $('final-score').textContent = score;
+  $('new-best').style.display = newBest ? 'inline' : 'none';
+  $('end-title').textContent = byHp ? '飛機被擊落 💥' : '時間到！';
+  const endWho = $('end-who');
+  if (player) {
+    const photo = photoForStudent(player.studentId) || 'face-default.svg';
+    endWho.innerHTML = `<img class="end-photo" src="${photo}" alt="${player.studentId}"><div>學號 ${player.studentId}</div>`;
+  } else {
+    endWho.textContent = '—';
+  }
+  $('end-screen').classList.remove('hidden');
+  uploadScore();
+}
+
+$('start').addEventListener('click', openGate);
+$('restart').addEventListener('click', openGate);
+$('sound').addEventListener('click', () => {
+  soundOn = !soundOn;
+  $('sound').textContent = soundOn ? '🔊 音效：開' : '🔇 音效：關';
+});
+$('music').addEventListener('click', () => {
+  musicOn = !musicOn;
+  $('music').textContent = musicOn ? '🎵 音樂：開' : '🎵 音樂：關';
+  if (running) {
+    if (musicOn) startBgm();
+    else stopBgm();
+  }
+});
+
+// 初始化頭像
+setPlayerFaceSrc();
+preloadFaces();
+// 預先繪一張靜態畫面（讓畫布不是全黑）
+spawnWave();
+render();
+</script>
+</body>
+</html>
