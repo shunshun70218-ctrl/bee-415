@@ -587,6 +587,7 @@ applyDiffUI();
 
 // === Gate ===
 function openGate() {
+  $('end-screen').classList.add('hidden'); // 確保結束畫面先關掉，gate 才看得到
   $('gate-err').textContent = '';
   $('in-student').value = player ? player.studentId : '';
   $('gate-screen').classList.remove('hidden');
