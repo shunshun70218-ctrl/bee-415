@@ -108,14 +108,18 @@
     image-rendering: pixelated;
     image-rendering: crisp-edges;
   }
-  .stage .hint {
-    position: absolute;
-    left: 50%; bottom: 8px;
-    transform: translateX(-50%);
-    color: rgba(255,255,255,0.55);
-    font-size: 0.78rem;
-    pointer-events: none;
-    z-index: 5;
+  .play-hint {
+    margin-top: 0.6rem;
+    color: #2a4a1a;
+    font-size: 0.82rem;
+    text-align: center;
+    opacity: 0.85;
+    background: rgba(255,255,255,0.7);
+    padding: 0.3rem 0.8rem;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    position: relative;
+    z-index: 1;
   }
   .stage.paused::after {
     content: '⏸ 按 ▶️ 開始遊戲';
@@ -447,8 +451,8 @@
 
   <div class="stage paused" id="stage">
     <canvas id="cv" width="480" height="640"></canvas>
-    <div class="hint">⬅️ ➡️ 移動 ・ 空白鍵 / 點擊 射擊 ・ 手機可拖曳</div>
   </div>
+  <div class="play-hint">⬅️ ➡️ 移動 ・ 空白鍵 / 點擊 射擊 ・ 手機可拖曳</div>
 
   <div class="controls">
     <button id="start">▶️ 開始遊戲</button>
@@ -919,9 +923,9 @@ function update(dt) {
     if (!bee.alive) continue;
     // boss 不俯衝（會在原地左右晃，但會頻繁開火）
     if (bee.isBoss) {
-      // 慢慢左右移動
+      // 慢慢左右移動（拉低 y 讓 HP 條跟皇冠都看得到）
       bee.x = W/2 + Math.sin(performance.now() / (bee.isTeacher ? 700 : 900)) * (W * 0.32);
-      bee.y = 40 + Math.cos(performance.now() / 1300) * 10;
+      bee.y = 70 + Math.cos(performance.now() / 1300) * 10;
       if (!inTransition && Math.random() < fireChance * (bee.isTeacher ? 3.5 : 2.0) * (dt/16)) {
         // boss 開火：往玩家方向
         const dx = playerObj.x - bee.x, dy = playerObj.y - bee.y;
@@ -971,7 +975,7 @@ function update(dt) {
   }
   if (needDescend) {
     formation.dir *= -1;
-    formation.descend += 8;
+    formation.descend = Math.min(formation.descend + 8, 220); // 防止編隊下沉到玩家下方
   }
 
   // 敵彈
@@ -1050,6 +1054,11 @@ function update(dt) {
     p.life -= dt;
   }
   particles = particles.filter(p => p.life > 0);
+
+  // 防呆：每幀檢查還有沒有活著的蜜蜂；若一隻都沒了，直接晉級
+  if (running && bees.filter(b => b.alive).length === 0) {
+    nextLevel();
+  }
 }
 
 function fireEnemyBullet(x, y) {
@@ -1303,6 +1312,33 @@ function render() {
     ctx.fillRect(p.x, p.y, p.size, p.size);
   }
   ctx.globalAlpha = 1;
+
+  // 編隊清光只剩 BOSS：頭上加閃動 ⚠ BOSS! 箭頭
+  const aliveBees = bees.filter(b => b.alive);
+  const onlyBoss = aliveBees.length === 1 && aliveBees[0].isBoss;
+  if (onlyBoss) {
+    const boss = aliveBees[0];
+    const blink = (Math.sin(performance.now()/150) + 1) / 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 18px -apple-system, "PingFang TC", sans-serif';
+    ctx.fillStyle = `rgba(255,80,80,${0.65 + blink*0.35})`;
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+    ctx.lineWidth = 4;
+    const label = boss.isTeacher ? '⚠️ 老師大魔王！' : '⚠️ 打 BOSS！';
+    ctx.strokeText(label, W/2, H - 90);
+    ctx.fillText(label, W/2, H - 90);
+    // 向上箭頭
+    ctx.fillStyle = `rgba(255,200,40,${0.7 + blink*0.3})`;
+    ctx.beginPath();
+    ctx.moveTo(W/2, H - 110);
+    ctx.lineTo(W/2 - 12, H - 90);
+    ctx.lineTo(W/2 + 12, H - 90);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
 
   // 關卡介紹覆蓋
   if (performance.now() < levelTransitionUntil) {
