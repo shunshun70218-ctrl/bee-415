@@ -537,11 +537,16 @@ function pickEmoji(studentId) {
 
 const $ = id => document.getElementById(id);
 
-// === 三段難度設定 ===
+// === 三段難度設定（v2：大幅調難）===
+// beeFireChance：每蜂每幀開火機率
+// formationBase / formationPerWave：編隊水平速度（隨關數加速）
+// maxDivers：同時最多幾隻俯衝
+// diveVy：俯衝速度
+// volley：每次發射敵彈顆數（1=單發, 3=三連發扇形）
 const DIFFICULTIES = {
-  easy:   { label: '😌 簡單', beeSpeed: 0.35, diveChance: 0.0018, beeBulletSpeed: 2.0, playerCool: 240, rows: 3 },
-  normal: { label: '🙂 普通', beeSpeed: 0.55, diveChance: 0.0035, beeBulletSpeed: 2.8, playerCool: 200, rows: 4 },
-  hard:   { label: '😈 困難', beeSpeed: 0.85, diveChance: 0.006,  beeBulletSpeed: 3.6, playerCool: 170, rows: 5 },
+  easy:   { label: '😌 簡單', diveChance: 0.0040, beeBulletSpeed: 3.0, beeFireChance: 0.0035, playerCool: 220, rows: 4, formationBase: 0.7, formationPerWave: 0.10, maxDivers: 2, diveVy: 0.20, volley: 1 },
+  normal: { label: '🙂 普通', diveChance: 0.0075, beeBulletSpeed: 3.8, beeFireChance: 0.0065, playerCool: 200, rows: 5, formationBase: 1.05, formationPerWave: 0.16, maxDivers: 3, diveVy: 0.26, volley: 1 },
+  hard:   { label: '😈 困難', diveChance: 0.014,  beeBulletSpeed: 5.0, beeFireChance: 0.013,  playerCool: 230, rows: 5, formationBase: 1.55, formationPerWave: 0.24, maxDivers: 6, diveVy: 0.34, volley: 3 },
 };
 let difficulty = localStorage.getItem('bee_diff') || 'normal';
 if (!DIFFICULTIES[difficulty]) difficulty = 'normal';
@@ -794,7 +799,7 @@ function spawnWave() {
   }
   formation.dir = 1;
   formation.descend = 0;
-  formation.speed = 0.5 + wave * 0.08;
+  formation.speed = D.formationBase + wave * D.formationPerWave;
 }
 
 // ===== 主迴圈 =====
@@ -836,6 +841,8 @@ function update(dt) {
 
   // 蜜蜂編隊水平移動
   let needDescend = false;
+  let divingCount = 0;
+  for (const bee of bees) if (bee.alive && bee.state === 'diving') divingCount++;
   for (const bee of bees) {
     if (!bee.alive) continue;
     if (bee.state === 'formation') {
@@ -843,21 +850,26 @@ function update(dt) {
       bee.x = bee.baseX;
       bee.y = bee.baseY + formation.descend;
       if (bee.x < 20 || bee.x > W - 20) needDescend = true;
-      // 隨機俯衝
-      if (Math.random() < D.diveChance * (dt/16)) {
+      // 隨機俯衝（限制同時俯衝隻數）
+      if (divingCount < D.maxDivers && Math.random() < D.diveChance * (dt/16)) {
         bee.state = 'diving';
-        bee.vx = (playerObj.x - bee.x) / 240;
-        bee.vy = 0.18 + Math.random() * 0.15;
+        bee.vx = (playerObj.x - bee.x) / 220;
+        bee.vy = D.diveVy * (0.85 + Math.random() * 0.3);
         bee.diveT = 0;
+        divingCount++;
+      }
+      // 編隊內也會偶爾開火（增加壓力）
+      if (Math.random() < D.beeFireChance * 0.35 * (dt/16)) {
+        fireEnemyBullet(bee.x, bee.y + 12);
       }
     } else if (bee.state === 'diving') {
       bee.diveT += dt;
       bee.x += bee.vx * dt;
       bee.y += bee.vy * dt;
-      bee.vy += 0.0008 * dt; // 慢慢加速
-      // 偶爾發射敵彈
-      if (Math.random() < 0.0025 * (dt/16) && bee.y < H - 100) {
-        enemyBullets.push({ x: bee.x, y: bee.y + 16, w: 4, h: 10, vy: D.beeBulletSpeed * 0.5 });
+      bee.vy += 0.0010 * dt; // 加速
+      // 俯衝時頻繁開火
+      if (Math.random() < D.beeFireChance * (dt/16) && bee.y < H - 80) {
+        fireEnemyBullet(bee.x, bee.y + 16);
       }
       // 飛出畫面，回編隊
       if (bee.y > H + 30) {
@@ -873,8 +885,11 @@ function update(dt) {
   }
 
   // 敵彈
-  for (const b of enemyBullets) b.y += b.vy * dt * 0.06 + b.vy * (dt/16);
-  enemyBullets = enemyBullets.filter(b => b.y < H + 20);
+  for (const b of enemyBullets) {
+    b.y += b.vy * (dt/16);
+    if (b.vx) b.x += b.vx * dt;
+  }
+  enemyBullets = enemyBullets.filter(b => b.y < H + 20 && b.x > -10 && b.x < W + 10);
 
   // 玩家子彈 vs 蜜蜂
   for (const bul of bullets) {
@@ -928,6 +943,18 @@ function update(dt) {
     p.life -= dt;
   }
   particles = particles.filter(p => p.life > 0);
+}
+
+function fireEnemyBullet(x, y) {
+  // hard 模式 volley=3：扇形三連發；其他單發直線
+  const vyBase = D.beeBulletSpeed * 0.5;
+  if (D.volley >= 3) {
+    for (let i = -1; i <= 1; i++) {
+      enemyBullets.push({ x: x + i*4, y, w: 4, h: 10, vy: vyBase, vx: i * 0.05 });
+    }
+  } else {
+    enemyBullets.push({ x, y, w: 4, h: 10, vy: vyBase, vx: 0 });
+  }
 }
 
 function hitPlayer() {

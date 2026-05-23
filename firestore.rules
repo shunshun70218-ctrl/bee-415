@@ -1,0 +1,85 @@
+// === Firestore Security Rules ===
+//
+// 這個專案放：whack-a-mole-v2 的 scores、小蜜蜂 bee-415 的 scores、
+// 以及 gomoku 線上對戰 gomoku_rooms。
+//
+// scores 規則放寬：
+// - 多一個 optional 'game' 欄位（'mole' 或 'bee'），舊資料沒有也能讀
+// - score 上限提高到 9999（小蜜蜂可能跑到上千分）
+//
+// gomoku_rooms 維持原樣。
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ====== 班級遊戲排行榜（打地鼠 + 小蜜蜂 共用 collection）======
+    match /scores/{doc} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(['studentId', 'emoji', 'score', 'difficulty', 'game', 'createdAt'])
+        && request.resource.data.studentId is string
+        && request.resource.data.studentId.size() > 0
+        && request.resource.data.studentId.size() <= 20
+        && request.resource.data.emoji is string
+        && request.resource.data.emoji.size() <= 8
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        && request.resource.data.score <= 9999
+        && request.resource.data.difficulty in ['easy', 'normal', 'hard']
+        && (!('game' in request.resource.data) || request.resource.data.game in ['mole', 'bee'])
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // ====== 五子棋線上對戰房間（維持原樣）======
+    match /gomoku_rooms/{code} {
+      allow read: if true;
+
+      allow create: if
+        request.resource.data.keys().hasOnly(
+          ['code','hostId','hostStone','guestId','guestStone','moves','turn','winner','status','createdAt','updatedAt']
+        )
+        && request.resource.data.code is string
+        && request.resource.data.code.size() >= 4
+        && request.resource.data.code.size() <= 8
+        && request.resource.data.hostId is string
+        && request.resource.data.hostId.size() > 0
+        && request.resource.data.hostId.size() <= 20
+        && request.resource.data.hostStone in [1, 2]
+        && request.resource.data.guestStone in [1, 2]
+        && request.resource.data.guestId == null
+        && request.resource.data.moves is list
+        && request.resource.data.moves.size() == 0
+        && request.resource.data.turn in [1, 2]
+        && request.resource.data.winner == 0
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if
+        request.resource.data.code == resource.data.code
+        && request.resource.data.hostId == resource.data.hostId
+        && request.resource.data.hostStone == resource.data.hostStone
+        && request.resource.data.guestStone == resource.data.guestStone
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.turn in [1, 2]
+        && request.resource.data.winner in [0, 1, 2, 3]
+        && request.resource.data.status in ['waiting', 'playing', 'finished']
+        && request.resource.data.moves is list
+        && request.resource.data.moves.size() <= 225
+        && (
+             (resource.data.guestId == null
+               && request.resource.data.guestId is string
+               && request.resource.data.guestId.size() > 0
+               && request.resource.data.guestId.size() <= 20)
+             || (request.resource.data.guestId == resource.data.guestId)
+           );
+
+      allow delete: if true;
+    }
+  }
+}
