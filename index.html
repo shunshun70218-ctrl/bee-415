@@ -1412,6 +1412,7 @@ async function uploadScore() {
       score,
       difficulty,
       game: 'bee',
+      level,
       createdAt: serverTimestamp(),
     });
     statusEl.textContent = '✅ 分數已上傳到排行榜';

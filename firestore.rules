@@ -18,7 +18,7 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if
-        request.resource.data.keys().hasOnly(['studentId', 'emoji', 'score', 'difficulty', 'game', 'createdAt'])
+        request.resource.data.keys().hasOnly(['studentId', 'emoji', 'score', 'difficulty', 'game', 'level', 'createdAt'])
         && request.resource.data.studentId is string
         && request.resource.data.studentId.size() > 0
         && request.resource.data.studentId.size() <= 20
@@ -29,6 +29,7 @@ service cloud.firestore {
         && request.resource.data.score <= 9999
         && request.resource.data.difficulty in ['easy', 'normal', 'hard']
         && (!('game' in request.resource.data) || request.resource.data.game in ['mole', 'bee'])
+        && (!('level' in request.resource.data) || (request.resource.data.level is int && request.resource.data.level >= 1 && request.resource.data.level <= 999))
         && request.resource.data.createdAt == request.time;
 
       allow update, delete: if false;
